@@ -41,6 +41,7 @@ jobs:
           policy: policy/egress-edge.json
           fail-on: high
           comment: false          # one sticky comment per PR (segmentation job owns it)
+          upload-sarif: false     # one SARIF category per PR (segmentation job owns it)
       - name: Linux egress gateway must forward the browser flows
         if: always()              # report both proofs even if the first fails
         uses: optimesh-ai/RuleHawk@feat/github-action-gate
@@ -49,3 +50,4 @@ jobs:
           policy: policy/egress-host.json
           fail-on: high
           comment: false
+          upload-sarif: false
