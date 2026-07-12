@@ -1,0 +1,51 @@
+name: Firewall gate
+
+# Every PR that touches a firewall config gets audited before it can merge:
+#   1. hygiene + zone segmentation across ALL configs (PCI isolation proofs)
+#   2. Zscaler egress connectivity proofs, scoped to the configs that own the
+#      egress path (a branch filter is not supposed to reach the ZEN ranges,
+#      so connectivity policies are applied per config set — see README).
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  security-events: write   # SARIF -> inline annotations on the PR diff
+  pull-requests: write     # the sticky review comment
+
+jobs:
+  segmentation:
+    name: Hygiene + PCI segmentation (all configs)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # TODO: pin to optimesh-ai/RuleHawk@v1 once the hardening branch is
+      # merged and the v1 tag moved (must_reach needs the branch engine).
+      - uses: optimesh-ai/RuleHawk@feat/github-action-gate
+        with:
+          configs: network/*
+          policy: policy/segmentation.json
+          fail-on: high
+
+  zscaler-egress:
+    name: Zscaler egress connectivity proofs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Edge firewall must permit the ZEN + tunnel flows
+        uses: optimesh-ai/RuleHawk@feat/github-action-gate
+        with:
+          configs: network/edge-asa.cfg
+          policy: policy/egress-edge.json
+          fail-on: high
+          comment: false          # one sticky comment per PR (segmentation job owns it)
+      - name: Linux egress gateway must forward the browser flows
+        if: always()              # report both proofs even if the first fails
+        uses: optimesh-ai/RuleHawk@feat/github-action-gate
+        with:
+          configs: network/egress-iptables.rules
+          policy: policy/egress-host.json
+          fail-on: high
+          comment: false

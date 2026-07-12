@@ -1,0 +1,22 @@
+# ============================================================================
+# ACME RETAIL — LINUX EGRESS GATEWAY (iptables-save)
+# The forward path for user web traffic into the Zscaler ZEN ranges.
+# policy/egress-host.json asserts the browser flows provably work here.
+# ============================================================================
+*filter
+:INPUT DROP [0:0]
+:FORWARD DROP [0:0]
+:OUTPUT DROP [0:0]
+-A OUTPUT -o lo -j ACCEPT
+-A OUTPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+-A OUTPUT -p udp -d 10.50.0.53/32 --dport 53 -j ACCEPT
+-A OUTPUT -p udp -d 203.0.113.123/32 --dport 123 -j ACCEPT
+-A INPUT -i lo -j ACCEPT
+-A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+-A INPUT -s 10.20.0.0/16 -p tcp --dport 22 -j ACCEPT
+-A FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+-A FORWARD -s 10.20.0.0/16 -d 185.46.212.0/23 -p tcp -m multiport --dports 80,443,9400,9480 -j ACCEPT
+-A FORWARD -s 10.20.0.0/16 -d 104.129.192.0/20 -p tcp -m multiport --dports 80,443,9400,9480 -j ACCEPT
+-A FORWARD -s 10.20.0.0/16 -d 185.46.212.0/23 -p udp --dport 443 -j ACCEPT
+-A FORWARD -s 10.20.0.0/16 -d 104.129.192.0/20 -p udp --dport 443 -j ACCEPT
+COMMIT

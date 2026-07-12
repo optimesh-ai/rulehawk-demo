@@ -1,0 +1,40 @@
+name: Zscaler range refresh
+
+# Zscaler expands its enforcement-node ranges over time. This job pulls the
+# published feed weekly; when it changes, it opens a PR updating the
+# ZSCALER_ZEN zone — and the Firewall gate on that PR then PROVES whether the
+# current configs already permit the new ranges, or the rollout needs a
+# firewall change first. Egress readiness stays continuously verified.
+on:
+  schedule:
+    - cron: '17 6 * * 1'   # Mondays 06:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update ZEN ranges from the published feed
+        run: python3 tools/update_zscaler_zones.py
+      - name: Open a PR if the ranges changed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo "no change"; exit 0
+          fi
+          BRANCH="zscaler-ranges-$(date -u +%Y%m%d)"
+          git config user.name "zscaler-refresh[bot]"
+          git config user.email "actions@github.com"
+          git switch -c "${BRANCH}"
+          git add policy/
+          git commit -m "Zscaler ZEN ranges changed upstream — re-prove egress"
+          git push -u origin "${BRANCH}"
+          gh pr create --fill --title "Zscaler ZEN ranges changed — re-prove egress connectivity" \
+            --body "The published enforcement-node feed changed. The **Firewall gate** on this PR proves whether the current configs already permit the new ranges (connectivity-ok) or the rollout needs a firewall change first (connectivity-broken)."

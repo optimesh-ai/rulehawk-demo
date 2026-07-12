@@ -1,0 +1,22 @@
+! ============================================================================
+! ACME RETAIL — CORE INTER-ZONE ACL (Cisco IOS)
+! The zone boundary: CORP workstations, the PCI cardholder environment,
+! the DMZ, and the OT floor. policy/segmentation.json declares what must
+! NEVER cross here; RuleHawk proves it on every PR.
+! ============================================================================
+ip access-list extended CORE-INTERZONE
+ ! PCI isolation: nothing from CORP or the DMZ enters the CDE. These denies
+ ! are load-bearing — RuleHawk will flag any change that makes them dead.
+ deny ip 10.20.0.0 0.0.255.255 10.10.0.0 0.0.255.255
+ deny ip 203.0.113.0 0.0.0.255 10.10.0.0 0.0.255.255
+ ! OT floor: no Modbus/DNP3 from the corporate side.
+ deny tcp 10.20.0.0 0.0.255.255 10.30.0.0 0.0.255.255 eq 502
+ deny tcp 10.20.0.0 0.0.255.255 10.30.0.0 0.0.255.255 eq 20000
+ ! CORP to the shared-services block (10.50/16): web, DNS, ping.
+ permit tcp 10.20.0.0 0.0.255.255 10.50.0.0 0.0.255.255 eq 443
+ permit udp 10.20.0.0 0.0.255.255 host 10.50.0.53 eq domain
+ permit icmp 10.20.0.0 0.0.255.255 10.50.0.0 0.0.255.255 echo
+ ! Duplicate of the web rule left behind by a 2024 change — safe to delete;
+ ! RuleHawk lists it in the Cleanup plan (low severity, does not block).
+ permit tcp 10.20.0.0 0.0.255.255 10.50.0.0 0.0.255.255 eq 443
+ deny ip any any log
