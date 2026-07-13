@@ -22,17 +22,27 @@ No agents, no device credentials, no appliance. Configs never leave the runner.
 
 ## See it catch real mistakes (2 minutes)
 
-Three pull requests are permanently open in this repo, each a realistic bad change
-held at the gate. Open one and look at the checks + the review comment:
+**Ten pull requests are permanently open** in this repo — nine realistic bad
+changes held red at the gate, and one clean change that sails through green.
+Open any of them and look at the checks + the sticky review comment. They span
+all six vendors and every finding class RuleHawk produces:
 
-| PR | The change | What RuleHawk says |
-|---|---|---|
-| **The PCI leak** | "Temporarily" allow CORP → PCI on 445 for a file-share migration | 🔴 `SEGMENTATION VIOLATION (CORP must not reach PCI): the ACL PERMITS 10.20.0.1 -> 10.10.0.1:445 (tcp)` — with the paste-ready deny that fixes it |
-| **The broken tunnel** | Tidy-up removes the "unused" UDP 4500 permit | 🔴 `CONNECTIVITY BROKEN … no ruleset permits ANY packet of 192.0.2.0/29 -> ZEN:4500` — IPsec NAT-T would have died in production; 500 still being open is *not* accepted as proof for 4500 |
-| **The phantom block** | An "emergency block" deny added *below* the permit that already matches the traffic | 🔴 `This deny NEVER takes effect — the traffic you meant to block is ALLOWED` (intent-inversion, critical) |
+| # | PR | Vendor | What RuleHawk says |
+|---|---|---|---|
+| [1](../../pull/1) | "Temporarily" allow CORP → PCI on 445 | Cisco IOS | 🔴 **segmentation-violation** — witness `10.20.0.1 → 10.10.0.1:445`, paste-ready deny |
+| [2](../../pull/2) | Remove the "unused" UDP 4500 permit | Cisco ASA | 🔴 **connectivity-broken** — IPsec NAT-T dies; 500 open ≠ proof for 4500 |
+| [3](../../pull/3) | "Emergency block" added below the matching permit | Cisco IOS | 🔴 **intent-inversion-deny-dead** — "the traffic you meant to block is ALLOWED" |
+| [4](../../pull/4) | Blanket `-j ACCEPT` on FORWARD "while debugging" | iptables | 🔴 **permit-any-any** + a batch of **segmentation-violations** |
+| [5](../../pull/5) | RDP + SMB to the jump box from anywhere | Cisco IOS | 🔴 **dangerous-exposure** (RDP/SMB from `any` source) |
+| [6](../../pull/6) | New app permit added below the catch-all deny | Cisco IOS | 🔴 **intent-inversion-permit-dead** — silent connectivity loss |
+| [7](../../pull/7) | A guest-VLAN block that two earlier permits already defeat | Cisco NX-OS | 🔴 **union-shadowed-deny-dead** — cumulative shadow, cites the pair |
+| [8](../../pull/8) | CORP reporting tool → PCI database | Palo Alto PAN-OS | 🔴 **segmentation-violation** — witness `10.20.0.1 → 10.10.20.1:5432` |
+| [9](../../pull/9) | Zscaler adds a new ZEN range the firewall misses | policy | 🔴 **connectivity-broken** — egress readiness re-proven on every range change |
+| [10](../../pull/10) | Least-privilege: drop an unused port | Juniper Junos | ✅ **all green** — isolation still proven, safe to merge |
 
-Merges are blocked; the sticky review comment carries the witness packets; the
-Security tab gets SARIF annotations on the exact lines.
+Merges are blocked on the red ones; the sticky review comment carries the witness
+packets; the Security tab gets SARIF annotations on the exact lines. PR #10 shows
+the other half of the story — RuleHawk is also the fast *yes* on a good change.
 
 ## Try it locally (60 seconds)
 
