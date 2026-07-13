@@ -6,4 +6,7 @@ ip access-list DC-TOR-EDGE
   10 permit tcp 10.50.10.0/24 10.50.20.0/24 eq 5432
   20 permit tcp 10.20.0.0/16 10.50.10.0/24 eq 443
   30 deny ip 10.20.0.0/16 10.10.0.0/16
+  15 permit ip 10.70.0.0/24 10.50.0.0/16
+  16 permit ip 10.70.1.0/24 10.50.0.0/16
+  17 deny ip 10.70.0.0/23 10.50.0.0/16
   40 deny ip any any
