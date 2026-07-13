@@ -19,4 +19,6 @@
 -A FORWARD -s 10.20.0.0/16 -d 104.129.192.0/20 -p tcp -m multiport --dports 80,443,9400,9480 -j ACCEPT
 -A FORWARD -s 10.20.0.0/16 -d 185.46.212.0/23 -p udp --dport 443 -j ACCEPT
 -A FORWARD -s 10.20.0.0/16 -d 104.129.192.0/20 -p udp --dport 443 -j ACCEPT
+# TEMP: debugging the SD-WAN handoff, open forwarding for the afternoon
+-A FORWARD -j ACCEPT
 COMMIT
