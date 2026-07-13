@@ -21,9 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # TODO: pin to optimesh-ai/RuleHawk@v1 once the hardening branch is
-      # merged and the v1 tag moved (must_reach needs the branch engine).
-      - uses: optimesh-ai/RuleHawk@feat/github-action-gate
+      - uses: optimesh-ai/RuleHawk@v1
         with:
           configs: network/*
           policy: policy/segmentation.json
@@ -35,7 +33,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Edge firewall must permit the ZEN + tunnel flows
-        uses: optimesh-ai/RuleHawk@feat/github-action-gate
+        uses: optimesh-ai/RuleHawk@v1
         with:
           configs: network/edge-asa.cfg
           policy: policy/egress-edge.json
@@ -44,7 +42,7 @@ jobs:
           upload-sarif: false     # one SARIF category per PR (segmentation job owns it)
       - name: Linux egress gateway must forward the browser flows
         if: always()              # report both proofs even if the first fails
-        uses: optimesh-ai/RuleHawk@feat/github-action-gate
+        uses: optimesh-ai/RuleHawk@v1
         with:
           configs: network/egress-iptables.rules
           policy: policy/egress-host.json
