@@ -9,6 +9,8 @@ set address svc-web ip-netmask 10.50.10.0/24
 set address svc-db ip-netmask 10.50.20.0/24
 set service svc-https protocol tcp port 443
 set service svc-pgsql protocol tcp port 5432
+set address pci-db ip-netmask 10.10.20.0/24
 set rulebase security rules corp-to-web from corp to dc source corp-users destination svc-web application any service svc-https action allow
 set rulebase security rules web-to-db from dc to dc source svc-web destination svc-db application any service svc-pgsql action allow
+set rulebase security rules reporting-to-pci from any to any source corp-users destination pci-db application any service svc-pgsql action allow
 set rulebase security rules deny-rest from any to any source any destination any application any service any action deny
