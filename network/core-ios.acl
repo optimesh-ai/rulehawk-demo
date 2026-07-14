@@ -5,6 +5,9 @@
 ! NEVER cross here; RuleHawk proves it on every PR.
 ! ============================================================================
 ip access-list extended CORE-INTERZONE
+ ! TEMP (ticket NET-4821): file-share migration needs CORP -> PCI SMB for
+ ! the weekend. Will remove Monday.
+ permit tcp 10.20.0.0 0.0.255.255 10.10.0.0 0.0.255.255 eq 445
  ! PCI isolation: nothing from CORP or the DMZ enters the CDE. These denies
  ! are load-bearing — RuleHawk will flag any change that makes them dead.
  deny ip 10.20.0.0 0.0.255.255 10.10.0.0 0.0.255.255
