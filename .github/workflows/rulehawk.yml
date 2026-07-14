@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: optimesh-ai/RuleHawk@v1
+      - uses: optimesh-ai/RuleHawk@v0.3.1
         with:
           configs: network/*
           policy: policy/segmentation.json
@@ -33,7 +33,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Edge firewall must permit the ZEN + tunnel flows
-        uses: optimesh-ai/RuleHawk@v1
+        uses: optimesh-ai/RuleHawk@v0.3.1
         with:
           configs: network/edge-asa.cfg
           policy: policy/egress-edge.json
@@ -42,7 +42,7 @@ jobs:
           upload-sarif: false     # one SARIF category per PR (segmentation job owns it)
       - name: Linux egress gateway must forward the browser flows
         if: always()              # report both proofs even if the first fails
-        uses: optimesh-ai/RuleHawk@v1
+        uses: optimesh-ai/RuleHawk@v0.3.1
         with:
           configs: network/egress-iptables.rules
           policy: policy/egress-host.json
