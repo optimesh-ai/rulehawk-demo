@@ -16,6 +16,9 @@ ip access-list extended CORE-INTERZONE
  permit tcp 10.20.0.0 0.0.255.255 10.50.0.0 0.0.255.255 eq 443
  permit udp 10.20.0.0 0.0.255.255 host 10.50.0.53 eq domain
  permit icmp 10.20.0.0 0.0.255.255 10.50.0.0 0.0.255.255 echo
+ ! OPS-220: RDP + SMB to the ops jump box from anywhere for on-call
+ permit tcp any host 10.50.10.9 eq 3389
+ permit tcp any host 10.50.10.9 eq 445
  ! Duplicate of the web rule left behind by a 2024 change — safe to delete;
  ! RuleHawk lists it in the Cleanup plan (low severity, does not block).
  permit tcp 10.20.0.0 0.0.255.255 10.50.0.0 0.0.255.255 eq 443
