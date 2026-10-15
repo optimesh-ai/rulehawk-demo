@@ -60,7 +60,7 @@ jobs:
             // Only comment when this run checked the PR's current head.
             const pr = prs.find(p => p.head.sha === context.sha);
             if (!pr) { core.notice('no open PR at this commit; nothing to comment on'); return; }
-            const {data: comments} = await github.rest.issues.listComments(
+            const comments = await github.paginate(github.rest.issues.listComments,
               {owner, repo, issue_number: pr.number, per_page: 100});
             // The verdict comment is ours: the marker alone could be quoted
             // by a person.
@@ -74,12 +74,26 @@ jobs:
               core.notice('the PR moved on since this run started; not posting a stale verdict');
               return;
             }
+            let commentId;
             if (mine) {
               await github.rest.issues.updateComment(
                 {owner, repo, comment_id: mine.id, body});
+              commentId = mine.id;
             } else {
-              await github.rest.issues.createComment(
+              const {data: made} = await github.rest.issues.createComment(
                 {owner, repo, issue_number: pr.number, body});
+              commentId = made.id;
+            }
+            // A push can still land between the check above and the write.
+            // If it did, say so on the comment instead of leaving an old
+            // verdict standing; the newer commit's own run replaces it.
+            const {data: after} = await github.rest.pulls.get(
+              {owner, repo, pull_number: pr.number});
+            if (after.head.sha !== context.sha) {
+              await github.rest.issues.updateComment({owner, repo, comment_id: commentId,
+                body: `${marker}\nThis verdict was for commit ${context.sha.slice(0, 7)}; ` +
+                      `the PR is now at ${after.head.sha.slice(0, 7)}. ` +
+                      'The gate run for the new commit replaces this comment.\n'});
             }
 
   zscaler-egress:
