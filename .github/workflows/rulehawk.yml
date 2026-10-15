@@ -9,6 +9,9 @@ on:
   pull_request:
   push:
     branches: [main]
+  # The weekly Zscaler refresh dispatches this on its bot branch, because
+  # pull_request runs on a PR made with GITHUB_TOKEN wait for manual approval.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -26,6 +29,39 @@ jobs:
           configs: network/*
           policy: policy/segmentation.json
           fail-on: high
+      # The action only comments on pull_request events. On a dispatched run,
+      # post the same sticky comment on the open PR whose head is this branch.
+      - name: Sticky PR comment (dispatched run)
+        if: always() && github.event_name == 'workflow_dispatch'
+        continue-on-error: true
+        uses: actions/github-script@v9
+        env:
+          # Via env, never ${{ }} inside the script: the ref is caller-chosen.
+          RH_REF: ${{ github.ref_name }}
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- rulehawk-gate -->';
+            const path = `${process.env.RUNNER_TEMP}/rulehawk-comment.md`;
+            let body = '';
+            try { body = fs.readFileSync(path, 'utf8'); }
+            catch (e) { core.warning('no comment body: ' + e); return; }
+            const {owner, repo} = context.repo;
+            const {data: prs} = await github.rest.pulls.list(
+              {owner, repo, state: 'open', head: `${owner}:${process.env.RH_REF}`});
+            // Only comment when this run checked the PR's current head.
+            const pr = prs.find(p => p.head.sha === context.sha);
+            if (!pr) { core.notice('no open PR at this commit; nothing to comment on'); return; }
+            const {data: comments} = await github.rest.issues.listComments(
+              {owner, repo, issue_number: pr.number, per_page: 100});
+            const mine = comments.find(c => c.body && c.body.includes(marker));
+            if (mine) {
+              await github.rest.issues.updateComment(
+                {owner, repo, comment_id: mine.id, body});
+            } else {
+              await github.rest.issues.createComment(
+                {owner, repo, issue_number: pr.number, body});
+            }
 
   zscaler-egress:
     name: Zscaler egress connectivity proofs
