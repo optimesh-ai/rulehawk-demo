@@ -20,3 +20,5 @@ ip access-list extended CORE-INTERZONE
  ! RuleHawk lists it in the Cleanup plan (low severity, does not block).
  permit tcp 10.20.0.0 0.0.255.255 10.50.0.0 0.0.255.255 eq 443
  deny ip any any log
+ ! NET-5511: access to the new reporting app on 8080
+ permit tcp 10.20.0.0 0.0.255.255 10.50.0.0 0.0.255.255 eq 8080
