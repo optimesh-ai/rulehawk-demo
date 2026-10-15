@@ -19,4 +19,6 @@ ip access-list extended CORE-INTERZONE
  ! Duplicate of the web rule left behind by a 2024 change — safe to delete;
  ! RuleHawk lists it in the Cleanup plan (low severity, does not block).
  permit tcp 10.20.0.0 0.0.255.255 10.50.0.0 0.0.255.255 eq 443
+ ! SEC-1092: block the compromised kiosk VLAN from shared services NOW.
+ deny tcp 10.20.0.0 0.0.255.255 10.50.0.0 0.0.255.255 eq 443
  deny ip any any log
