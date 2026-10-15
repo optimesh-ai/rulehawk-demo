@@ -13,6 +13,13 @@ on:
   # pull_request runs on a PR made with GITHUB_TOKEN wait for manual approval.
   workflow_dispatch:
 
+# Dispatched runs on one branch are serialized and the newest wins, so an
+# older run cannot overwrite a newer verdict. Other events get a group of
+# their own (the run id), so pull_request and push behave exactly as before.
+concurrency:
+  group: ${{ github.event_name == 'workflow_dispatch' && format('gate-dispatch-{0}', github.ref) || format('gate-run-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'workflow_dispatch' }}
+
 permissions:
   contents: read
   security-events: write   # SARIF -> inline annotations on the PR diff
@@ -46,6 +53,7 @@ jobs:
             let body = '';
             try { body = fs.readFileSync(path, 'utf8'); }
             catch (e) { core.warning('no comment body: ' + e); return; }
+            body += `\n\n<sub>Checked commit ${context.sha.slice(0, 7)}.</sub>\n`;
             const {owner, repo} = context.repo;
             const {data: prs} = await github.rest.pulls.list(
               {owner, repo, state: 'open', head: `${owner}:${process.env.RH_REF}`});
@@ -54,7 +62,18 @@ jobs:
             if (!pr) { core.notice('no open PR at this commit; nothing to comment on'); return; }
             const {data: comments} = await github.rest.issues.listComments(
               {owner, repo, issue_number: pr.number, per_page: 100});
-            const mine = comments.find(c => c.body && c.body.includes(marker));
+            // The verdict comment is ours: the marker alone could be quoted
+            // by a person.
+            const mine = comments.find(c => c.user && c.user.login === 'github-actions[bot]'
+              && c.body && c.body.includes(marker));
+            // Re-check the head right before writing: a push since the lookup
+            // means this verdict is for an older commit.
+            const {data: now} = await github.rest.pulls.get(
+              {owner, repo, pull_number: pr.number});
+            if (now.head.sha !== context.sha) {
+              core.notice('the PR moved on since this run started; not posting a stale verdict');
+              return;
+            }
             if (mine) {
               await github.rest.issues.updateComment(
                 {owner, repo, comment_id: mine.id, body});
