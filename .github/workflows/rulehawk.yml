@@ -118,3 +118,31 @@ jobs:
           fail-on: high
           comment: false
           upload-sarif: false
+
+  # Check runs from a dispatched run sit on the commit but are not listed on
+  # the PR. Commit statuses are, so mirror each proof's result as one.
+  pr-status:
+    name: Report dispatched verdicts on the PR
+    if: always() && github.event_name == 'workflow_dispatch'
+    needs: [segmentation, zscaler-egress]
+    runs-on: ubuntu-latest
+    permissions:
+      statuses: write
+    steps:
+      - uses: actions/github-script@v9
+        env:
+          SEG_RESULT: ${{ needs.segmentation.result }}
+          EGRESS_RESULT: ${{ needs.zscaler-egress.result }}
+        with:
+          script: |
+            const {owner, repo} = context.repo;
+            const target_url = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            const state = r => r === 'success' ? 'success' : (r === 'failure' ? 'failure' : 'error');
+            for (const [name, result] of [
+              ['Hygiene + PCI segmentation (all configs)', process.env.SEG_RESULT],
+              ['Zscaler egress connectivity proofs', process.env.EGRESS_RESULT],
+            ]) {
+              await github.rest.repos.createCommitStatus({owner, repo, sha: context.sha,
+                state: state(result), context: `Firewall gate / ${name}`,
+                description: `${result} (dispatched run)`, target_url});
+            }
