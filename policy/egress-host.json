@@ -1,10 +1,33 @@
 {
   "zones": {
-    "CORP":        ["10.20.0.0/16"],
-    "ZSCALER_ZEN": ["185.46.212.0/23", "104.129.192.0/20"]
+    "CORP": [
+      "10.20.0.0/16"
+    ],
+    "ZSCALER_ZEN": [
+      "185.46.212.0/23",
+      "104.129.192.0/20",
+      "165.225.0.0/17"
+    ]
   },
   "must_reach": [
-    { "src": "CORP", "dst": "ZSCALER_ZEN", "proto": "tcp", "ports": [80, 443, 9400, 9480] },
-    { "src": "CORP", "dst": "ZSCALER_ZEN", "proto": "udp", "ports": [443] }
+    {
+      "src": "CORP",
+      "dst": "ZSCALER_ZEN",
+      "proto": "tcp",
+      "ports": [
+        80,
+        443,
+        9400,
+        9480
+      ]
+    },
+    {
+      "src": "CORP",
+      "dst": "ZSCALER_ZEN",
+      "proto": "udp",
+      "ports": [
+        443
+      ]
+    }
   ]
 }
