@@ -25,19 +25,69 @@ permissions:
   security-events: write   # SARIF -> inline annotations on the PR diff
   pull-requests: write     # the sticky review comment
 
+# Every proof shares its result (share-results) instead of commenting on its
+# own; the verdict job below folds them into ONE sticky comment headed by the
+# worst verdict (FAIL > UNKNOWN > PASS), so a passing proof can never paint
+# the comment green while another one fails.
+
 jobs:
   segmentation:
     name: Hygiene + PCI segmentation (all configs)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: optimesh-ai/RuleHawk@v0.3.1
+      - uses: optimesh-ai/RuleHawk@618bdf45337c2b53bc42ea364248b254ccb189cb  # main after PR #18; repin to the next release
         with:
           configs: network/*
           policy: policy/segmentation.json
           fail-on: high
+          label: Hygiene + PCI segmentation (all configs)
+          comment: false          # the verdict job posts one comment for every proof
+          share-results: true
+
+  zscaler-egress:
+    name: Zscaler egress connectivity proofs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Edge firewall must permit the ZEN + tunnel flows
+        uses: optimesh-ai/RuleHawk@618bdf45337c2b53bc42ea364248b254ccb189cb  # main after PR #18; repin to the next release
+        with:
+          configs: network/edge-asa.cfg
+          policy: policy/egress-edge.json
+          fail-on: high
+          label: Edge firewall must permit the ZEN + tunnel flows
+          comment: false          # the verdict job posts one comment for every proof
+          share-results: true
+          upload-sarif: false     # one SARIF category per PR (segmentation job owns it)
+      - name: Linux egress gateway must forward the browser flows
+        if: always()              # report both proofs even if the first fails
+        uses: optimesh-ai/RuleHawk@618bdf45337c2b53bc42ea364248b254ccb189cb  # main after PR #18; repin to the next release
+        with:
+          configs: network/egress-iptables.rules
+          policy: policy/egress-host.json
+          fail-on: high
+          label: Linux egress gateway must forward the browser flows
+          comment: false
+          share-results: true
+          upload-sarif: false
+
+  # One sticky comment for the whole gate: every proof above, headed by the
+  # worst verdict. Fewer than `expect` results, or a proof job that did not
+  # succeed without a failing result to show for it, reads UNKNOWN, never PASS.
+  verdict:
+    name: Firewall gate verdict (every proof)
+    if: ${{ !cancelled() }}
+    needs: [segmentation, zscaler-egress]
+    runs-on: ubuntu-latest
+    steps:
+      - id: combined
+        uses: optimesh-ai/RuleHawk/comment@618bdf45337c2b53bc42ea364248b254ccb189cb  # main after PR #18; repin to the next release
+        with:
+          expect: 3               # one per proof step above
+          jobs: ${{ toJSON(needs) }}
       # The action only comments on pull_request events. On a dispatched run,
-      # post the same sticky comment on the open PR whose head is this branch.
+      # post the same combined comment on the open PR whose head is this branch.
       - name: Sticky PR comment (dispatched run)
         if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' }}
         continue-on-error: true
@@ -45,11 +95,12 @@ jobs:
         env:
           # Via env, never ${{ }} inside the script: the ref is caller-chosen.
           RH_REF: ${{ github.ref_name }}
+          RH_COMMENT_PATH: ${{ steps.combined.outputs.comment-file }}
         with:
           script: |
             const fs = require('fs');
             const marker = '<!-- rulehawk-gate -->';
-            const path = `${process.env.RUNNER_TEMP}/rulehawk-comment.md`;
+            const path = process.env.RH_COMMENT_PATH;
             let body = '';
             try { body = fs.readFileSync(path, 'utf8'); }
             catch (e) { core.warning('no comment body: ' + e); return; }
@@ -96,35 +147,13 @@ jobs:
                       'The gate run for the new commit replaces this comment.\n'});
             }
 
-  zscaler-egress:
-    name: Zscaler egress connectivity proofs
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Edge firewall must permit the ZEN + tunnel flows
-        uses: optimesh-ai/RuleHawk@v0.3.1
-        with:
-          configs: network/edge-asa.cfg
-          policy: policy/egress-edge.json
-          fail-on: high
-          comment: false          # one sticky comment per PR (segmentation job owns it)
-          upload-sarif: false     # one SARIF category per PR (segmentation job owns it)
-      - name: Linux egress gateway must forward the browser flows
-        if: always()              # report both proofs even if the first fails
-        uses: optimesh-ai/RuleHawk@v0.3.1
-        with:
-          configs: network/egress-iptables.rules
-          policy: policy/egress-host.json
-          fail-on: high
-          comment: false
-          upload-sarif: false
 
   # Check runs from a dispatched run sit on the commit but are not listed on
   # the PR. Commit statuses are, so mirror each proof's result as one.
   pr-status:
     name: Report dispatched verdicts on the PR
     if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' }}
-    needs: [segmentation, zscaler-egress]
+    needs: [segmentation, zscaler-egress, verdict]
     runs-on: ubuntu-latest
     permissions:
       statuses: write
@@ -133,6 +162,7 @@ jobs:
         env:
           SEG_RESULT: ${{ needs.segmentation.result }}
           EGRESS_RESULT: ${{ needs.zscaler-egress.result }}
+          VERDICT_RESULT: ${{ needs.verdict.result }}
         with:
           script: |
             const {owner, repo} = context.repo;
@@ -141,6 +171,7 @@ jobs:
             for (const [name, result] of [
               ['Hygiene + PCI segmentation (all configs)', process.env.SEG_RESULT],
               ['Zscaler egress connectivity proofs', process.env.EGRESS_RESULT],
+              ['Firewall gate verdict (every proof)', process.env.VERDICT_RESULT],
             ]) {
               await github.rest.repos.createCommitStatus({owner, repo, sha: context.sha,
                 state: state(result), context: `Firewall gate / ${name}`,

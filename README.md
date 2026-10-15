@@ -85,7 +85,9 @@ tools/update_zscaler_zones.py  refreshes ZEN ranges from Zscaler's published fee
 against *every* audited config — and a branch filter is not supposed to reach
 the ZEN ranges. So the gate runs the segmentation policy across everything, and
 each connectivity policy only against the configs that own that path. Two jobs,
-four lines of YAML each.
+four lines of YAML each — plus a verdict job that folds every proof into the one
+sticky comment, headed by the worst result, so a passing segmentation proof can
+never read green while an egress proof fails.
 
 **Why the weekly refresh matters:** Zscaler expands its enforcement-node ranges;
 an egress rule proven last quarter can silently miss a new range. The cron job
